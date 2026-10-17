@@ -1,0 +1,6 @@
+{
+  "name": "학급 활동 순서 도우미",
+  "description": "초등학교 담임교사를 위한 수업 활동 순서 정하기 및 진행 확인 웹앱",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

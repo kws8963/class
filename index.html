@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>학급 활동 순서 도우미</title>
+  <meta name="description" content="초등학교 담임교사를 위한 수업 활동 순서 정하기 및 진행 확인 웹앱">
+  <meta property="og:title" content="학급 활동 순서 도우미">
+  <meta property="og:description" content="초등학교 담임교사를 위한 수업 활동 순서 정하기 및 진행 확인 웹앱">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- 상단: 앱 제목, 진행 상태, 시트 연동 설정 버튼 -->
+    <header class="app-header">
+      <div class="header-main">
+        <div class="title-group">
+          <span class="header-icon" aria-hidden="true">🏫</span>
+          <div>
+            <h1 class="app-title">학급 활동 순서 도우미</h1>
+            <p class="app-subtitle">초등학교 교실을 위한 개인정보 없는 안전한 수업 활동 진행기</p>
+          </div>
+        </div>
+        
+        <div class="header-actions-group">
+          <!-- 구글 시트 연동 상태 뱃지 및 설정 열기 버튼 -->
+          <div class="sheet-connection-status">
+            <span id="connection-indicator-dot" class="status-dot dot-disconnected" aria-hidden="true"></span>
+            <span id="connection-status-label" class="connection-label">시트 미연동</span>
+            <button type="button" id="open-settings-btn" class="btn btn-secondary btn-sm" title="구글 스프레드시트 웹 앱 URL 설정">
+              ⚙️ 시트 연동 설정
+            </button>
+          </div>
+
+          <!-- 현재 진행 상태 전광판 -->
+          <div class="header-status-box">
+            <div class="status-meta">
+              <span class="status-label">현재 진행 상태</span>
+              <span id="progress-text" class="status-badge status-active">활동 1 / 4 진행 중</span>
+            </div>
+            <!-- 시각적 프로그레스 바 -->
+            <div class="progress-track" aria-hidden="true">
+              <div id="progress-bar" class="progress-fill" style="width: 25%;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- 본문 2열 레이아웃: 왼쪽(입력·추가·시트동기화) / 오른쪽(현재 활동 및 순서 목록) -->
+    <main class="main-layout">
+      <!-- 왼쪽: 활동 이름 입력 및 추가 패널 -->
+      <section class="panel left-panel" aria-labelledby="add-section-title">
+        <div class="panel-header">
+          <h2 id="add-section-title" class="panel-title">✏️ 활동 추가하기</h2>
+          <span id="activity-counter" class="counter-badge">등록됨: 4개</span>
+        </div>
+
+        <form id="activity-form" class="add-form" onsubmit="return false;">
+          <label for="activity-name-input" class="input-label">
+            새 활동 이름
+            <span class="required-mark" aria-hidden="true">*</span>
+          </label>
+          <div class="input-group">
+            <input 
+              type="text" 
+              id="activity-name-input" 
+              class="text-input" 
+              placeholder="예: 생각 열기, 모둠 토의, 발표" 
+              maxlength="50"
+              autocomplete="off"
+            >
+            <button type="submit" id="add-btn" class="btn btn-primary add-btn">
+              추가하기
+            </button>
+          </div>
+          <p id="input-error-msg" class="field-error" role="alert" style="display: none;"></p>
+          <p class="input-hint">
+            🔒 학생 실명 등 개인정보는 입력하지 마시고 수업 활동명만 입력해 주세요.
+          </p>
+        </form>
+
+        <!-- 빠른 예시 도구 -->
+        <div class="sample-actions">
+          <button type="button" id="reset-sample-btn" class="btn btn-secondary btn-sm">
+            🎯 기본 예시 활동 불러오기
+          </button>
+          <button type="button" id="clear-all-list-btn" class="btn btn-secondary btn-sm text-danger">
+            🗑️ 전체 삭제
+          </button>
+        </div>
+
+        <!-- 구글 스프레드시트 연동 카드 -->
+        <div class="storage-info-card">
+          <div class="storage-info-header">
+            <span class="storage-icon" aria-hidden="true">📊</span>
+            <span class="storage-title">구글 스프레드시트 연동</span>
+            <span id="card-connection-badge" class="badge-status badge-status-gray">설정 필요</span>
+          </div>
+          <p class="storage-desc">
+            시트 스키마: A열 <code>활동 이름</code>, B열 <code>순서 목록</code><br>
+            선생님의 구글 시트에 활동 목록과 순번을 안전하게 저장하고 불러옵니다.
+          </p>
+
+          <!-- 시트 통신 상태 알림 영역 (로딩/성공/실패) -->
+          <div id="sync-status-box" class="sync-status-box" role="status" style="display: none;">
+            <span id="sync-spinner" class="spinner" aria-hidden="true" style="display: none;"></span>
+            <span id="sync-status-text" class="sync-status-text"></span>
+          </div>
+
+          <!-- 시트 동기화 버튼 그룹 -->
+          <div class="storage-buttons">
+            <button type="button" id="sheet-save-btn" class="btn btn-outline btn-sm">
+              <span class="btn-icon" aria-hidden="true">💾</span>
+              <span class="save-btn-text">시트에 저장</span>
+            </button>
+            <button type="button" id="sheet-load-btn" class="btn btn-outline btn-sm">
+              <span class="btn-icon" aria-hidden="true">📥</span>
+              <span class="load-btn-text">시트에서 불러오기</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 오른쪽: 순서 목록과 현재 활동 -->
+      <section class="panel right-panel" aria-labelledby="sequence-section-title">
+        <div class="panel-header">
+          <h2 id="sequence-section-title" class="panel-title">📋 활동 순서와 현재 진행</h2>
+        </div>
+
+        <!-- 현재 활동 전광판 (교실 뒷자리에서도 보이도록 대형 강조) -->
+        <div id="current-activity-card" class="current-card" role="region" aria-live="polite">
+          <div class="current-card-header">
+            <span class="now-badge">📌 지금 하고 있는 활동</span>
+            <span id="current-order-tag" class="order-tag">1번째 순서</span>
+          </div>
+          <div id="current-activity-title" class="current-title">
+            생각 열기 (동기 유발 퀴즈)
+          </div>
+          <div id="next-activity-preview" class="next-preview">
+            다음 활동 예정: <strong>모둠 토의 (활동지 작성)</strong>
+          </div>
+        </div>
+
+        <!-- 완료 시 나타나는 축하 카드 (평소엔 숨김) -->
+        <div id="finish-card" class="finish-card" role="region" aria-live="polite" style="display: none;">
+          <div class="finish-emoji" aria-hidden="true">🎉</div>
+          <h3 class="finish-title">오늘의 수업 활동을 모두 마쳤습니다!</h3>
+          <p class="finish-desc">모든 활동 순서를 성공적으로 진행했습니다. 참 잘했어요!</p>
+          <button type="button" id="restart-btn" class="btn btn-primary btn-lg">
+            처음부터 다시 시작하기
+          </button>
+        </div>
+
+        <!-- 전체 순서 리스트 -->
+        <div class="list-wrapper">
+          <div class="list-title-bar">
+            <span class="list-heading">전체 활동 순서 목록</span>
+            <span class="list-guide">등록한 활동을 섞어도 중복·누락 없이 한 번씩 진행됩니다.</span>
+          </div>
+
+          <ol id="activity-list" class="activity-ol" aria-label="수업 활동 순서 목록">
+            <!-- 자바스크립트로 안전하게(textContent) 동적 렌더링 -->
+          </ol>
+
+          <div id="empty-list-notice" class="empty-list-box" style="display: none;">
+            <p>등록된 활동이 없습니다.</p>
+            <p class="empty-sub">왼쪽 입력창에서 수업 활동을 등록하거나 [기본 예시 활동 불러오기]를 눌러보세요.</p>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- 하단: 섞기·다음·초기화 제어 바 -->
+    <footer class="app-footer" role="toolbar" aria-label="수업 진행 제어 도구">
+      <div class="footer-control-bar">
+        <button type="button" id="shuffle-btn" class="btn btn-control btn-shuffle" title="등록된 활동의 순서를 무작위로 섞습니다.">
+          <span class="btn-icon" aria-hidden="true">🎲</span>
+          <span class="btn-text">순서 섞기</span>
+        </button>
+
+        <button type="button" id="next-btn" class="btn btn-control btn-next btn-primary" title="다음 활동으로 순서를 이동합니다.">
+          <span class="btn-text">다음 활동</span>
+          <span class="btn-icon" aria-hidden="true">👉</span>
+        </button>
+
+        <button type="button" id="reset-btn" class="btn btn-control btn-reset" title="현재 진행 상태를 첫 번째 활동으로 초기화합니다.">
+          <span class="btn-icon" aria-hidden="true">🔄</span>
+          <span class="btn-text">진행 초기화</span>
+        </button>
+      </div>
+    </footer>
+  </div>
+
+  <!-- 구글 시트 연동 설정 모달 창 -->
+  <div id="settings-modal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="settings-modal-title" style="display: none;">
+    <div class="modal-card modal-card-wide">
+      <div class="modal-card-top">
+        <div class="modal-icon" aria-hidden="true">⚙️</div>
+        <h3 id="settings-modal-title" class="modal-heading">구글 스프레드시트 연동 설정</h3>
+      </div>
+      
+      <p class="modal-text text-left">
+        Google Apps Script를 배포하여 발급받은 <strong>웹 앱 URL</strong>을 입력해 주세요.<br>
+        자세한 배포 방법은 제공된 <code>setup.md</code> 안내 문서를 참고하세요.
+      </p>
+
+      <div class="modal-form-group">
+        <label for="script-url-input" class="input-label text-left">
+          Apps Script 웹 앱 URL
+          <span class="required-mark" aria-hidden="true">*</span>
+        </label>
+        <input 
+          type="url" 
+          id="script-url-input" 
+          class="text-input" 
+          placeholder="https://script.google.com/macros/s/.../exec"
+          autocomplete="off"
+        >
+        <p id="settings-error-msg" class="field-error text-left" style="display: none;"></p>
+        <p id="settings-success-msg" class="field-success text-left" style="display: none;"></p>
+      </div>
+
+      <div class="schema-reminder-box">
+        <strong>📌 시트 열 규격 확인:</strong><br>
+        1행 A열은 반드시 <code>활동 이름</code>, B열은 <code>순서 목록</code>이어야 합니다.<br>
+        (헤더 불일치 시 기존 데이터 보호를 위해 저장이 차단됩니다.)
+      </div>
+
+      <div class="modal-actions-bar">
+        <button type="button" id="save-and-test-btn" class="btn btn-primary">
+          연동 저장 및 테스트
+        </button>
+        <button type="button" id="clear-settings-btn" class="btn btn-secondary text-danger">
+          연동 해제
+        </button>
+        <button type="button" id="close-settings-modal-btn" class="btn btn-outline">
+          닫기
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="./app.js"></script>
+</body>
+</html>
